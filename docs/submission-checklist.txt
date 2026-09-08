@@ -1,0 +1,59 @@
+Final Submission Checklist
+
+Before sending the Git URL, capture evidence for each assessment item.
+
+1. Working cluster + accessible endpoint
+
+- [ ] gcloud container clusters list shows both clusters.
+- [ ] kubectl get pods -n demo shows multiple replicas in both clusters.
+- [ ] Gateway has a public IP.
+- [ ] curl http://GATEWAY_IP/api/app-a/info works.
+- [ ] curl http://GATEWAY_IP/api/app-b/hello works.
+- [ ] Repeated requests demonstrate different pods/clusters where traffic distribution permits.
+
+2. Grafana
+
+- [ ] Open Grafana URL.
+- [ ] Login with the generated admin credentials.
+- [ ] Open GKE Multi-Cluster Observability dashboard.
+- [ ] Generate traffic first with scripts/load-test.sh.
+- [ ] Wait several minutes for GCP metric/log ingestion.
+- [ ] Verify all four panels show data.
+- [ ] Export the dashboard JSON from Grafana or take a screenshot.
+- [ ] Put the exported dashboard under kubernetes/grafana/ if it differs from the provisioned version.
+
+3. BigQuery
+
+- [ ] Open BigQuery Studio.
+- [ ] Confirm gke_logs dataset exists.
+- [ ] Confirm stdout/generated workload log table exists.
+- [ ] Run at least three queries from bigquery/queries.sql.
+- [ ] Capture one screenshot of query results.
+
+4. Troubleshooting
+
+- [ ] Confirm docs/troubleshooting.txt contains the actual issue observed during deployment.
+- [ ] Include the actual command used to identify it.
+- [ ] Include the root cause.
+- [ ] Include the exact fix.
+- [ ] Include before/after evidence if possible.
+
+5. Repository quality
+
+- [ ] Remove .runtime/ and all credentials from Git.
+- [ ] git status does not show secrets.
+- [ ] README explains one-command deployment.
+- [ ] Architecture diagram is present.
+- [ ] Terraform is formatted.
+- [ ] No hard-coded project IDs remain.
+- [ ] No service-account JSON/private keys are committed.
+
+Recommended final Git commands
+
+
+git status
+git add .
+git commit -m "Complete GCP GKE observability assessment"
+git push origin main
+
+Then send the personal repository URL requested by the company.

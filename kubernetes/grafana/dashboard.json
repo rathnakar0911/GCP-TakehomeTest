@@ -1,0 +1,339 @@
+{
+  "uid": "gke-assessment",
+  "title": "GKE Multi-Cluster Observability",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "tags": [
+    "gke",
+    "sre",
+    "assessment"
+  ],
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Application error events / minute",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-bigquery-datasource",
+        "uid": "bigquery"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "queryType": "table",
+           "rawSql": "SELECT\n  $__timeGroup(timestamp, $__interval) AS time,\n  COUNT(*) AS error_count\nFROM `project-7ce37731-538d-4dc0-ae3.gke_logs.stdout`\nWHERE $__timeFilter(timestamp)\n  AND (severity = \"ERROR\" OR JSON_VALUE(TO_JSON_STRING(jsonPayload), '$.severity') = 'ERROR')\n  AND (JSON_VALUE(TO_JSON_STRING(jsonPayload), '$.application') IN ('app-a','app-b')\n       OR textPayload LIKE '%\\\"application\\\":\\\"app-a\\\"%'\n       OR textPayload LIKE '%\\\"application\\\":\\\"app-b\\\"%')\nGROUP BY time\nORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Pod restart counts by namespace",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcp-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "metrics",
+          "metricQuery": {
+            "editorMode": "visual",
+            "projectName": "GCP_PROJECT_ID_PLACEHOLDER",
+              "projectName": "project-7ce37731-538d-4dc0-ae3",
+            "metricType": "kubernetes.io/container/restart_count",
+            "metricKind": "CUMULATIVE",
+            "valueType": "INT64",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "perSeriesAligner": "ALIGN_MAX",
+            "alignmentPeriod": "60s",
+            "groupBys": [
+              "resource.label.namespace_name"
+            ],
+            "filters": [
+              "resource.type",
+              "=",
+              "k8s_container",
+              "AND",
+              "resource.label.namespace_name",
+              "=",
+              "demo"
+            ],
+            "aliasBy": "{{resource.label.namespace_name}}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Request latency percentiles (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcp-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "metrics",
+          "metricQuery": {
+            "editorMode": "visual",
+            "projectName": "GCP_PROJECT_ID_PLACEHOLDER",
+              "projectName": "project-7ce37731-538d-4dc0-ae3",
+            "metricType": "loadbalancing.googleapis.com/https/total_latencies",
+            "metricKind": "DELTA",
+            "valueType": "DISTRIBUTION",
+            "crossSeriesReducer": "REDUCE_NONE",
+            "perSeriesAligner": "ALIGN_50_PERCENTILE",
+            "alignmentPeriod": "60s",
+            "filters": [
+              "resource.type",
+              "=",
+              "https_lb_rule"
+            ],
+            "aliasBy": "p50"
+          }
+        },
+        {
+          "refId": "B",
+          "queryType": "metrics",
+          "metricQuery": {
+            "editorMode": "visual",
+            "projectName": "GCP_PROJECT_ID_PLACEHOLDER",
+              "projectName": "project-7ce37731-538d-4dc0-ae3",
+            "metricType": "loadbalancing.googleapis.com/https/total_latencies",
+            "metricKind": "DELTA",
+            "valueType": "DISTRIBUTION",
+            "crossSeriesReducer": "REDUCE_NONE",
+            "perSeriesAligner": "ALIGN_95_PERCENTILE",
+            "alignmentPeriod": "60s",
+            "filters": [
+              "resource.type",
+              "=",
+              "https_lb_rule"
+            ],
+            "aliasBy": "p95"
+          }
+        },
+        {
+          "refId": "C",
+          "queryType": "metrics",
+          "metricQuery": {
+            "editorMode": "visual",
+            "projectName": "GCP_PROJECT_ID_PLACEHOLDER",
+              "projectName": "project-7ce37731-538d-4dc0-ae3",
+            "metricType": "loadbalancing.googleapis.com/https/total_latencies",
+            "metricKind": "DELTA",
+            "valueType": "DISTRIBUTION",
+            "crossSeriesReducer": "REDUCE_NONE",
+            "perSeriesAligner": "ALIGN_99_PERCENTILE",
+            "alignmentPeriod": "60s",
+            "filters": [
+              "resource.type",
+              "=",
+              "https_lb_rule"
+            ],
+            "aliasBy": "p99"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Container CPU / memory utilization",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "gcp-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "metrics",
+          "metricQuery": {
+            "editorMode": "visual",
+            "projectName": "GCP_PROJECT_ID_PLACEHOLDER",
+              "projectName": "project-7ce37731-538d-4dc0-ae3",
+            "metricType": "kubernetes.io/container/cpu/limit_utilization",
+            "metricKind": "GAUGE",
+            "valueType": "DOUBLE",
+            "crossSeriesReducer": "REDUCE_MEAN",
+            "perSeriesAligner": "ALIGN_MEAN",
+            "alignmentPeriod": "60s",
+            "filters": [
+              "resource.type",
+              "=",
+              "k8s_container",
+              "AND",
+              "resource.label.namespace_name",
+              "=",
+              "demo"
+            ],
+            "groupBys": [
+              "resource.label.namespace_name"
+            ],
+            "aliasBy": "CPU {{resource.label.namespace_name}}"
+          }
+        },
+        {
+          "refId": "B",
+          "queryType": "metrics",
+          "metricQuery": {
+            "editorMode": "visual",
+            "projectName": "GCP_PROJECT_ID_PLACEHOLDER",
+              "projectName": "project-7ce37731-538d-4dc0-ae3",
+            "metricType": "kubernetes.io/container/memory/limit_utilization",
+            "metricKind": "GAUGE",
+            "valueType": "DOUBLE",
+            "crossSeriesReducer": "REDUCE_MEAN",
+            "perSeriesAligner": "ALIGN_MEAN",
+            "alignmentPeriod": "60s",
+            "filters": [
+              "resource.type",
+              "=",
+              "k8s_container",
+              "AND",
+              "resource.label.namespace_name",
+              "=",
+              "demo"
+            ],
+            "groupBys": [
+              "resource.label.namespace_name"
+            ],
+            "aliasBy": "Memory {{resource.label.namespace_name}}"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Assessment notes",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 5
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Observability path**  \nGKE workload logs \u2192 Cloud Logging \u2192 BigQuery \u2192 Grafana.  \nGKE resource and load-balancer metrics \u2192 Cloud Monitoring \u2192 Grafana.\n\n**Expected:** BigQuery error panel requires at least one application request/error in the selected time range. Monitoring panels may take 1\u20133 minutes for fresh GKE metrics."
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}

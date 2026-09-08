@@ -1,0 +1,68 @@
+Troubleshooting Scenario
+
+Scenario: application returns 503 through the Gateway
+
+Symptom
+
+The pods were healthy and kubectl get pods showed Running, but the public Gateway returned HTTP 503 for the application routes.
+
+Investigation
+
+
+kubectl -n demo get gateway,httproute
+kubectl -n demo get service,serviceexport
+kubectl -n demo get serviceimports.net.gke.io
+kubectl -n demo get pods -l app=app-a
+kubectl -n demo describe gateway global-external-gateway
+
+The first thing to establish is whether the Gateway has a valid backend reference and whether the ServiceImport exists.
+
+Then inspect the local Service and endpoints:
+
+
+kubectl -n demo get svc app-a
+kubectl -n demo get endpoints app-a
+kubectl -n demo describe svc app-a
+
+Root cause
+
+The load balancer's generated HTTP health checks probed /. App B returned 200 at /, but App A's controller-level /api/app-a mapping meant its root method was not exposed at the unprefixed path. App A therefore failed the external health check. During the first deployment attempt, the Mac also built ARM64 images while the GKE nodes required AMD64, causing no match for platform in manifest image-pull errors.
+
+Resolution
+
+The applications were fixed and redeployed:
+
+
+Both applications expose an unprefixed HTTP 200 endpoint for the LB check.
+docker build --platform linux/amd64 ...
+
+Then both deployments were restarted and endpoints remained healthy:
+
+
+kubectl -n demo rollout restart deployment/app-a deployment/app-b
+kubectl -n demo rollout status deployment/app-a
+kubectl -n demo rollout status deployment/app-b
+
+The Gateway backend became healthy and public requests returned HTTP 200:
+
+
+http://GATEWAY_IP/api/app-a/info -> HTTP 200
+http://GATEWAY_IP/api/app-b/hello -> HTTP 200
+
+Lesson learned
+
+For Kubernetes 503s, check the chain from the outside in:
+
+
+Gateway
+  -> HTTPRoute
+  -> ServiceImport
+  -> Service
+  -> Endpoints
+  -> Pods
+  -> Readiness probe
+  -> Application port
+
+This troubleshooting sequence is also useful for the interview discussion because it demonstrates systematic isolation rather than restarting pods blindly.
+
+Submission note: Add the actual timestamps, screenshots, and before/after output from the run before submitting.

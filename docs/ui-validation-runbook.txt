@@ -1,0 +1,174 @@
+GCP Console Validation Runbook
+
+This is a UI-only validation checklist for the assessment. Do not use gcloud, kubectl, Terraform, or CLI commands while collecting evidence. Complete the checks in order and take screenshots only where marked.
+
+Project and billing
+
+1. Open Google Cloud Console (https://console.cloud.google.com/).
+2. Select project project-7ce37731-538d-4dc0-ae3.
+3. Open Billing and confirm the project is linked to an active billing account.
+4. Open IAM & Admin > IAM and confirm your Google account has the required project access.
+
+Screenshot: 01-project-billing-iam.png
+
+APIs and infrastructure
+
+1. Open APIs & Services > Enabled APIs & services.
+2. Confirm these services are enabled: Kubernetes Engine, Compute Engine, Artifact Registry, BigQuery, Cloud Logging, Cloud Monitoring, GKE Hub, Multi-cluster Services, and Network Connectivity.
+3. Open VPC network > VPC networks and select assessment-vpc.
+4. Confirm the network is custom mode and has regional subnets in us-central1 and us-east1.
+5. Open VPC network > VPC networks > assessment-vpc > Subnets.
+6. Confirm gke-primary-subnet and gke-secondary-subnet exist with secondary ranges for Pods and Services.
+7. Open VPC network > Cloud Routers and confirm primary-router and secondary-router exist.
+8. Open Network services > Cloud NAT and confirm NAT is configured for both regions.
+9. Open Artifact Registry > Repositories and confirm repository gke-assessment exists in us-central1 with app-a and app-b images.
+
+Screenshot: 02-network-artifact-registry.png
+
+Two GKE clusters
+
+1. Open Kubernetes Engine > Clusters.
+2. Confirm gke-primary is RUNNING in us-central1.
+3. Confirm gke-secondary is RUNNING in us-east1.
+4. Open each cluster and verify:
+   - GKE Standard mode
+   - One general node pool
+   - Workload Identity enabled
+   - VPC-native networking
+   - Pod and Service secondary ranges
+   - Logging and Monitoring enabled
+5. Open Kubernetes Engine > Workloads.
+6. Select namespace demo and verify App A and App B have two or more healthy pods in each cluster.
+7. Open Kubernetes Engine > Services & Ingress and verify the application Services and Gateway resources.
+
+Screenshot: 03-two-gke-clusters-and-workloads.png
+
+Global application endpoint
+
+1. In Kubernetes Engine > Services & Ingress, select the primary cluster.
+2. Select namespace demo.
+3. Open global-external-gateway.
+4. Confirm the Gateway shows a public IP and a programmed/healthy status.
+5. Open a browser tab and visit:
+   - http://34.160.84.114/api/app-a/info
+   - http://34.160.84.114/api/app-b/hello
+6. Confirm both return JSON and HTTP success responses.
+7. Refresh App A and confirm the response includes application, cluster, pod, and timestamp fields.
+
+Screenshot: 04-global-gateway-and-app-response.png
+
+Multi-cluster Services
+
+1. In the primary cluster’s demo namespace, open the Services view.
+2. Confirm app-a and app-b are exported/discoverable through the multi-cluster service configuration.
+3. In the secondary cluster, confirm the matching application Services and healthy pods exist.
+4. Return to the Gateway details and confirm both routes are attached and accepted.
+
+Screenshot: 05-multi-cluster-services.png
+
+Grafana
+
+1. Open http://34.121.71.160.
+2. Sign in as admin.
+3. Retrieve the password only from the local .runtime/grafana-password.txt file. Do not put the password in Git or screenshots.
+4. Open dashboard GKE Multi-Cluster Observability.
+5. Set the dashboard time range to Last 1 hour.
+6. Confirm these four panels are visible and contain data:
+   - Application error events / minute
+   - Pod restart counts by namespace
+   - Request latency percentiles p50 / p95 / p99
+   - Container CPU / memory utilization
+7. Open Connections > Data sources and test both BigQuery and Google Cloud Monitoring data sources. Both should report success.
+8. Use Share > Export to export the dashboard JSON, or capture the complete dashboard in a screenshot.
+
+Screenshot: 06-grafana-four-panel-dashboard.png
+
+Important: generate traffic before this check and allow several minutes for Cloud Logging, BigQuery, and Cloud Monitoring ingestion. Do not mark the dashboard complete if panels are empty or show query errors.
+
+BigQuery log analysis
+
+1. Open BigQuery > SQL workspace.
+2. Expand project project-7ce37731-538d-4dc0-ae3.
+3. Expand dataset gke_logs.
+4. Confirm the generated workload log table exists, normally stdout.
+5. Open bigquery/queries.sql locally and copy three queries into BigQuery Studio.
+6. Replace PROJECT_ID with project-7ce37731-538d-4dc0-ae3.
+7. Run at least:
+   - Errors over time
+   - Errors by application
+   - Latency percentiles
+8. Confirm each query returns results and inspect the generated schema if fields are stored in textPayload rather than jsonPayload.
+
+Screenshot: 07-bigquery-query-results.png
+
+Cloud Logging and Monitoring
+
+1. Open Logging > Logs Explorer.
+2. Filter resource type Kubernetes Container and namespace demo.
+3. Confirm App A and App B request/error entries exist.
+4. Open Monitoring > Metrics Explorer.
+5. Confirm container CPU/memory metrics and kubernetes.io/container/restart_count are available.
+6. Confirm load-balancer latency metrics are available after traffic generation.
+
+Screenshot: 08-logging-and-monitoring.png
+
+Troubleshooting evidence
+
+Use the real issue encountered during this run. The strongest evidence is:
+
+- Symptom: public Gateway initially returned 503 no healthy upstream.
+- Investigation: load-balancer health checks probed /, while the applications did not expose an unprefixed root endpoint.
+- Fix: added HTTP 200 root endpoints, rebuilt AMD64 images, pushed them to Artifact Registry, and restarted both deployments.
+- Result: App A and App B returned HTTP 200 through the public Gateway.
+
+Also mention the earlier AMD64 image issue if useful: the first Mac-built images were ARM64 and GKE reported no match for platform in manifest; rebuilding with linux/amd64 fixed it.
+
+Update troubleshooting.txt (troubleshooting.txt) with the actual commands, timestamps, screenshots, and before/after evidence. Do not claim the selector-mismatch example unless it actually occurred.
+
+Screenshot: 09-troubleshooting-before-after.png
+
+Final coverage review
+
+Covered by implementation
+
+- Terraform infrastructure
+- Two GKE Standard clusters
+- Shared VPC, regional subnets, Pod/Service ranges, and Cloud NAT
+- Artifact Registry
+- Workload Identity
+- Spring Boot App A
+- FastAPI App B
+- Multiple replicas, HPAs, ConfigMaps, and Kubernetes Secrets
+- Multi-cluster Services
+- Global multi-cluster Gateway and external Application Load Balancer
+- Cloud Logging export to BigQuery
+- Grafana with BigQuery and Cloud Monitoring data sources
+- Four-panel dashboard definition
+- BigQuery sample queries
+- Architecture, design decisions, limitations, deployment, verification, load-test, and cleanup scripts
+
+Documented limitations or optional items
+
+- Folder/project hierarchy and enterprise IAM groups
+- Private Service Access
+- Cloud DNS, because no domain was supplied
+- HTTPS certificate and Cloud Armor
+- Anthos/Cloud Service Mesh, mTLS, and traffic shaping
+- Cloud Trace and Cloud Profiler
+- Secret Manager CSI integration
+- Binary Authorization
+- Stateful cross-region storage and backups
+- Enterprise SIEM integration
+
+These are documented in limitations.txt (limitations.txt) and are acceptable only where the assignment’s free-tier note permits skipping them.
+
+Before submission
+
+- [ ] All screenshots above are captured without passwords or private keys.
+- [ ] Grafana dashboard visibly contains data in all four panels.
+- [ ] At least three BigQuery queries have successful result screenshots.
+- [ ] Actual troubleshooting evidence is included in the troubleshooting record.
+- [ ] .runtime/ and all credentials are excluded from Git.
+- [ ] terraform.tfvars does not contain a secret.
+- [ ] The personal Git repository contains the final code and documentation.
+- [ ] The live GCP resources are cleaned up after evidence collection if charges must be avoided.

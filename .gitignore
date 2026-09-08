@@ -1,0 +1,13 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.terraform.lock.hcl
+.runtime/
+*.json.key
+*.pem
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.pyc

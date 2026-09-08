@@ -1,0 +1,37 @@
+Design Decisions and Rationale
+
+Two clusters
+
+Two clusters in separate regions create two independent failure domains. The same stateless applications are deployed to both, so a regional cluster failure does not remove all application capacity.
+
+GKE Standard
+
+Standard was selected because the assignment explicitly allows Standard or Autopilot and asks for a conventional node-pool model. The node pool is deliberately small for an assessment environment. Production would use multiple zones and workload-specific pools.
+
+Shared VPC
+
+Both clusters use the same VPC but dedicated regional subnets and secondary Pod/Service ranges. This is required by the multi-cluster Gateway design and keeps network addressing isolated by cluster.
+
+Multi-cluster Gateway
+
+The current GKE platform direction is Gateway API. The gke-l7-global-external-managed-mc GatewayClass creates a global external Application Load Balancer for services across a fleet. This is preferable to hand-building Compute Engine load-balancing resources because GKE owns the backend/NEG lifecycle.
+
+Stateless applications
+
+The applications do not store local session state. This makes replicas interchangeable and allows the same deployment to run in both clusters.
+
+HPA
+
+Both applications request CPU resources and have HPAs configured. This provides an explicit scaling policy rather than relying on manual replica changes.
+
+BigQuery
+
+BigQuery provides SQL-based historical log analysis and is explicitly required by the assignment. The log sink keeps application/GKE workload logs available for SQL analysis.
+
+Grafana
+
+Grafana is used as the single visualization surface. BigQuery is used for application log analytics, while Cloud Monitoring is used for operational metrics. This avoids trying to force Kubernetes system metrics into an analytical log schema.
+
+Security
+
+Workload Identity is enabled for GKE. Grafana uses a dedicated read-only service account with only BigQuery viewer/job and Monitoring Viewer permissions. Runtime credentials are never committed to Git.

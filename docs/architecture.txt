@@ -1,0 +1,48 @@
+Architecture Diagram and Request Flow
+
+Logical architecture
+
+flowchart LR
+  Internet --> DNS[Optional Cloud DNS]
+  DNS --> GW[Global External Application Load Balancer\nGKE Multi-cluster Gateway]
+
+  subgraph VPC[Shared VPC]
+    subgraph P[Primary us-central1]
+      PA[App A\n2+ Pods]
+      PB[App B\n2+ Pods]
+      GF[Grafana]
+    end
+    subgraph S[Secondary us-east1]
+      SA[App A\n2+ Pods]
+      SB[App B\n2+ Pods]
+    end
+  end
+
+  GW --> PA
+  GW --> PB
+  GW --> SA
+  GW --> SB
+
+  PA --> CL[Cloud Logging]
+  PB --> CL
+  SA --> CL
+  SB --> CL
+  CL --> BQ[BigQuery]
+  CL --> CM[Cloud Monitoring]
+  BQ --> GF
+  CM --> GF
+
+End-to-end request
+
+1. Client resolves the application hostname. In this assessment, a real DNS name is optional, so the Gateway IP can be used directly.
+2. Request reaches the GKE multi-cluster Gateway global external Application Load Balancer.
+3. The Gateway uses the fleet's multi-cluster service discovery to find the ServiceImport for the requested application.
+4. Health and capacity determine which healthy cluster/pod receives the request.
+5. The Kubernetes Service selects one of the application replicas.
+6. The application responds and emits structured request telemetry.
+7. Cloud Logging receives workload logs.
+8. A project log sink exports the demo namespace workload logs to BigQuery.
+9. Cloud Monitoring provides Kubernetes and load-balancer metrics.
+10. Grafana combines BigQuery log analytics and Cloud Monitoring metrics in one dashboard.
+
+GKE's multi-cluster Gateway documentation describes this model: clusters are registered to a fleet, one config cluster hosts Gateway resources, Services are exported from member clusters, and the global Gateway creates a unified external load balancer across healthy backends. 

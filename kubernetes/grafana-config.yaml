@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provisioning
+  namespace: observability
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: BigQuery
+        uid: bigquery
+        type: grafana-bigquery-datasource
+        access: proxy
+        isDefault: true
+        jsonData:
+          authenticationType: gce
+          defaultProject: ${GCP_PROJECT_ID}
+      - name: Google Cloud Monitoring
+        uid: gcp-monitoring
+        type: stackdriver
+        access: proxy
+        jsonData:
+          authenticationType: gce
+          defaultProject: ${GCP_PROJECT_ID}
+  dashboard-provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: GKE Assessment
+        orgId: 1
+        folder: GKE Assessment
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-env
+  namespace: observability
+data:
+  GCP_PROJECT_ID: "GCP_PROJECT_ID_PLACEHOLDER"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard
+  namespace: observability
+data:
+  gke-assessment.json: |
+    DASHBOARD_JSON_PLACEHOLDER
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      serviceAccountName: grafana
+      containers:
+      - name: grafana
+        image: grafana/grafana:12.2.5
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: admin
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin
+              key: password
+        - name: GF_INSTALL_PLUGINS
+          value: grafana-bigquery-datasource
+        envFrom:
+        - configMapRef:
+            name: grafana-env
+        volumeMounts:
+        - name: provisioning
+          mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
+          subPath: datasources.yaml
+        - name: provisioning
+          mountPath: /etc/grafana/provisioning/dashboards/dashboard-provider.yaml
+          subPath: dashboard-provider.yaml
+        - name: dashboard
+          mountPath: /var/lib/grafana/dashboards/gke-assessment.json
+          subPath: gke-assessment.json
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: provisioning
+        configMap:
+          name: grafana-provisioning
+      - name: dashboard
+        configMap:
+          name: grafana-dashboard
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: observability
+  annotations:
+    iam.gke.io/gcp-service-account: grafana-observer@GCP_PROJECT_ID_PLACEHOLDER.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  type: LoadBalancer
+  selector:
+    app: grafana
+  ports:
+  - port: 80
+    targetPort: 3000
